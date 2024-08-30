@@ -37,7 +37,7 @@ void processInfoSLP(uint64_t tid, uint64_t lAddr, uint64_t size)
     catch (const bad_alloc &e)
     {
         cerr << "Memory allocation failed for task " << tid << ": " << e.what() << endl;
-        throw runtime_error("Memory Full...");
+        throw runtime_error("Memory Fusize;ll...");
     }
 }
 
@@ -164,39 +164,30 @@ void printTaskSLP()
     cout << "Total Memory Allocated :" << totalMemAllocated << endl;
     cout << "Memory Used by PageTable:" << pageTableEntries*32 << endl;
 }
-void printTaskMLP()
-{
+void printTaskMLP() {
     cout << "Multi-Level Page Table Implementation" << endl;
-    uint64_t pageTableEntries1 = 0;
-    uint64_t pageTableEntries2 = 0;
-    uint64_t l1,l2;
     uint64_t totalPageHits = 0;
-    uint64_t totalPagefaults = 0;
+    uint64_t totalPageFaults = 0;
     uint64_t totalMemAllocated = 0;
-    for (auto &itr : tasksMLP)
-    {
-        pageTableEntries1 += (1 << itr.second.level1Bits);
-        pageTableEntries2 += (1 << itr.second.level2Bits);
-        l1 = itr.second.level1Bits;
-        l2 = itr.second.level2Bits;
-        totalPageHits += itr.second.pageHit;
-        totalPagefaults += itr.second.pageFault;
-        totalMemAllocated += itr.second.memoryAllocated;
-        cout << "Task" << itr.first << " ->Page Hits: " << itr.second.pageHit << " ,Page Faults:" << itr.second.pageFault << " ,Total memory allocated for this task: " << itr.second.memoryAllocated << endl;
+    for (auto &task : tasksMLP) {
+        totalPageHits += task.second.pageHit;
+        totalPageFaults += task.second.pageFault;
+        totalMemAllocated += task.second.memoryAllocated;
+        cout << "Task" << task.first << " ->Page Hits: " << task.second.pageHit << " ,Page Faults:" << task.second.pageFault << " ,Total memory allocated for this task: " << task.second.memoryAllocated << endl;
     }
     cout << "Total Page Hits :" << totalPageHits << endl;
-    cout << "Total Page faults :" << totalPagefaults << endl;
+    cout << "Total Page Faults :" << totalPageFaults << endl;
     cout << "Total Memory Allocated :" << totalMemAllocated << endl;
-    cout << "Memory Used by PageTable(Level1):" << pageTableEntries1*l1 << endl;
-    cout << "Memory Used by PageTable(Level2):" << pageTableEntries2*l2 << endl;
 }
+
 int main()
 {
-    string filename;
+    string filename = "tracefile_4KB_4GB_4GB.txt";
+
     int implementationType;
 
-    cout << "Enter the name of the input file: ";
-    cin >> filename;
+    // cout << "Enter the name of the input file: ";
+    // cin >> filename;
 
     cout << "Choose the page table implementation:" << endl;
     cout << "1. Basic (unordered_map)" << endl;

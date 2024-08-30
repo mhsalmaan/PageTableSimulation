@@ -9,16 +9,14 @@ using namespace std;
 //MemoryManager Main memory mplememted as queue.
 class MemoryManager {
 private:
-    queue<uint64_t> freeFrames;
+    vector<int> freeFrames;
 public:
     uint64_t totalFrames;
     uint64_t allocatedFrames = 0;
     MemoryManager(uint64_t totalFrames) : totalFrames(totalFrames) {
-        for (uint64_t i = 0; i < totalFrames; i++) {
-            freeFrames.push(i);
-        }
+        freeFrames.resize(totalFrames,0);
     }
-    uint64_t allocateFrame(); //function to allocate frames
+    uint64_t* allocateFrame(); //function to allocate frames
     uint64_t getRemainingFrames(); //function to give frames
 };
 

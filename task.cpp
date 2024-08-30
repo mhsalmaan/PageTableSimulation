@@ -6,22 +6,22 @@
 
 using namespace std;
 
-//Map Implementation(Logical page number is the key and physical page number is value)
-void Task::requestMemory(uint64_t lAddr, uint64_t size, MemoryManager &memoryManager)
-{
-    uint64_t pagesNeeded = ceil(size / PAGE_SIZE); //Total pages needed for asked memory allocation
-    uint32_t startPage = lAddr / PAGE_SIZE; //addr of starting page
+// Map Implementation(Logical page number is the key and physical page number is value)
+ void Task::requestMemory(uint64_t lAddr, uint64_t size, MemoryManager &memoryManager)
+ {
+     uint64_t pagesNeeded = ceil(size / PAGE_SIZE); //Total pages needed for asked memory allocation
+     uint32_t startPage = lAddr / PAGE_SIZE; //addr of starting page
 
     for (uint64_t i = 0; i < pagesNeeded; i++)
     {
         if (pageTable.find(startPage + i) != pageTable.end())
         {
-            pageHit++;  
+            pageHit++;
         }
         else
         {
             pageFault++;
-            uint64_t physicalPage = memoryManager.allocateFrame();
+            uint64_t* physicalPage = memoryManager.allocateFrame();
             pageTable[startPage + i] = physicalPage;
             memoryAllocated += PAGE_SIZE;
         }
@@ -33,13 +33,15 @@ void Task::requestMemory(uint64_t lAddr, uint64_t size, MemoryManager &memoryMan
 // Single-Level Page Table Implementation
 void TaskWSLP::requestMemory(uint64_t lAddr, uint64_t size, MemoryManager &memoryManager)
 {
-    uint64_t startPage = lAddr >> offsetBits;
+    uint64_t startPage = lAddr >> OFFSET_BITS;
     uint64_t endPage = startPage + (uint64_t)ceil((double)size / PAGE_SIZE);
 
-    // cout << "Requesting memory: Logical Address = " << lAddr
-    //      << ", Size = " << size
-    //      << ", Start Page = " << startPage
-    //      << ", End Page = " << endPage << endl;
+    cout << "Requesting memory: Logical Address = " << lAddr
+         << ", Size = " << size
+         << ", Start Page = " << startPage
+         << ", End Page = " << endPage << endl;
+
+    cout << pageTable.size() << endl;
 
     for (uint64_t pageNumber = startPage; pageNumber < endPage; pageNumber++)
     {
@@ -47,19 +49,23 @@ void TaskWSLP::requestMemory(uint64_t lAddr, uint64_t size, MemoryManager &memor
         {
             throw out_of_range("Page number exceeds virtual address space");
         }
-        auto itr = find(pageTable.begin(), pageTable.end(), pageNumber);
-        if (itr != pageTable.end())
+        // auto itr = find(pageTable.begin(), pageTable.end(), pageNumber);
+        // if (itr != pageTable.end())
+        // {
+        //     pageHit++;
+        //     // cout << "Page Table allocated for logical addr :" << pageNumber << endl;
+        // }
+        if (pageTable[pageNumber] != nullptr)
         {
             pageHit++;
-            // cout << "Page Table allocated for logical addr :" << pageNumber << endl;
+            cout << "Page Table Hit for entry at :" << pageNumber << " with addr :" << pageTable[pageNumber] << endl;
         }
         else
         {
             pageFault++;
-            uint64_t physicalPage = memoryManager.allocateFrame();
-            // cout << "Allocated Physical Page = " << physicalPage
-            //      << " for Logical Page = " << pageNumber << endl;
-            pageTable.push_back(pageNumber);
+            uint64_t *physicalPageAddr = memoryManager.allocateFrame();
+            cout << "Allocated Physical Page Addr = " << physicalPageAddr << " for Logical Page = " << pageNumber << endl;
+            pageTable[pageNumber] = physicalPageAddr;
             memoryAllocated += PAGE_SIZE;
         }
     }
@@ -70,69 +76,49 @@ void TaskWSLP::requestMemory(uint64_t lAddr, uint64_t size, MemoryManager &memor
 // // Two-Level Page Table Implementation
 void TaskWMLP::requestMemory(uint64_t lAddr, uint64_t size, MemoryManager &memoryManager)
 {
-    uint64_t startPage = lAddr >> offsetBits; //Starting page
-    uint64_t endPage = startPage + (uint64_t)ceil((double)size / PAGE_SIZE); //lastPage
+    uint64_t startPage = lAddr >> OFFSET_BITS;                               // Starting page
+    uint64_t endPage = startPage + (uint64_t)ceil((double)size / PAGE_SIZE); // lastPage
 
-    // cout << "Requesting memory: Logical Address = " << lAddr
-    //      << ", Size = " << size
-    //      << ", Start Page = " << startPage
-    //      << ", End Page = " << endPage << endl;
+    cout << "Requesting memory: Logical Address = " << lAddr
+         << ", Size = " << size
+         << ", Start Page = " << startPage
+         << ", End Page = " << endPage << endl;
 
     for (uint64_t pageNumber = startPage; pageNumber < endPage; pageNumber++)
     {
-        uint64_t level1Index = pageNumber >> level2Bits;
-        uint64_t level2Index = pageNumber & ((1ULL << level2Bits) - 1);
+        uint64_t level1Index = pageNumber >> LEVEL_2_BITS;
+        uint64_t level2Index = pageNumber & ((1ULL << LEVEL_2_BITS) - 1);
 
-        // cout << "Individual Page Number: " << pageNumber << endl;
-        // cout << "Level 1 Index:" << level1Index << " ,Level 2 Index:" << level2Index << endl;
+        cout << "Individual Page Number: " << pageNumber << endl;
+        cout << "Level 1 Index:" << level1Index << " ,Level 2 Index:" << level2Index << endl;
+        cout << "Level 1 Bits:" << LEVEL_1_BITS << " ,Level 2 Bits:" << LEVEL_2_BITS << endl;
 
         // Check if level1 entry exists, if not create it
-        if (pageTable.find(level1Index) == pageTable.end())
+        if (pageTable[level1Index] == nullptr)
         {
-            pageTable[level1Index] = vector<uint64_t>();
+            // pageFault++;
+            pageTable[level1Index] = new vector<uint64_t *>(LEVEL_2_SIZE, nullptr);
         }
 
-        // Check if page is already allocated
-        auto &level2Table = pageTable[level1Index];
-        auto itr = find(level2Table.begin(), level2Table.end(), level2Index);
-
-        if (itr != level2Table.end())
+        if ((*pageTable[level1Index])[level2Index] == nullptr)
         {
-            pageHit++;
-            // cout << "Page Hit..." << endl;
+            pageFault++;
+            uint64_t *frame = memoryManager.allocateFrame();
+            if (frame != nullptr)
+            {
+                memoryAllocated += PAGE_SIZE;
+                (*pageTable[level1Index])[level2Index] = frame;
+                cout << "Page Fault!.. Address " << (*pageTable[level1Index])[level2Index] << " stored at index (" << level1Index << ", " << level2Index << ")" << endl;
+            }
         }
         else
         {
-            pageFault++;
-            uint64_t physicalPage = memoryManager.allocateFrame();
-            // cout << "Page fault..." << endl;
-            // cout << "Allocated Physical Page = " << physicalPage
-            //      << " for Logical Page = " << pageNumber << endl;
-            level2Table.push_back(level2Index);
-            memoryAllocated += PAGE_SIZE;
+            pageHit++;
+            cout << "Page hit! Address " << (*pageTable[level1Index])[level2Index] << " stored at index (" << level1Index << ", " << level2Index << ")" << endl;
         }
     }
 
     // cout << "Multi-Level Page Table Memory Allocated...." << endl;
-    // printPageTableStatus();
-}
-
-//For debugging print page table status
-void TaskWMLP::printPageTableStatus() const
-{
-    cout << "Multi-Level Page Table Status:" << endl;
-    for (const auto &level1Entry : pageTable)
-    {
-        for (const auto &level2Index : level1Entry.second)
-        {
-            uint64_t pageNumber = (level1Entry.first << level2Bits) | level2Index;
-            cout << "Page Table allocated for logical addr: " << pageNumber << endl;
-        }
-    }
-
-    cout << "Task" << tid << " ->Page Hits: " << pageHit
-         << " ,Page Faults:" << pageFault
-         << " ,Total memory allocated for this task: " << memoryAllocated << endl;
 }
 
 
