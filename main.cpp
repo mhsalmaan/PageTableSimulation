@@ -182,7 +182,7 @@ void printTaskMLP() {
 
 int main()
 {
-    string filename = "tracefile_4KB_4GB_4GB.txt";
+    string filename = /*"tracefile_4KB_4GB_4GB.txt"*/"output.txt";
 
     int implementationType;
 

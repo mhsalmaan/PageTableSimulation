@@ -33,7 +33,7 @@ $(TEST_TARGET): $(TEST_OBJS)
 
 # Compile test source file
 test.o: test.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $< -o $@ -lpthread
 
 # Clean up
 clean:

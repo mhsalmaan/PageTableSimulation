@@ -4,7 +4,7 @@
 #include <cmath>
 
 // Page size alignment
-#define PAGE_SIZE 1024  // 2main KB
+#define PAGE_SIZE 4096  // 2main KB
 
 //Virtual Memory
 #define VIRTUAL_MEMORY 8ULL*1024*1024*1024
@@ -21,5 +21,17 @@
 
 #define LEVEL_1_SIZE (1U << LEVEL_1_BITS)
 #define LEVEL_2_SIZE (1U << LEVEL_2_BITS)
+
+//For trace generation
+
+#define TEXT_SECTION_ADDRESS 0x0000000000005730
+
+#define DATA_SECTION_ADDRESS 0x000000000005c380
+
+#define BSS_SECTION_ADDRESS 0x000000000005c7c0
+
+#define HEAP_SECTION_ADDRESS 0x0000000000061a80
+
+#define STACK_SECTION_ADDRESS 0x00000000bfc00000
 
 #endif

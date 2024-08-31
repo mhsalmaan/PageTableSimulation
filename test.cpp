@@ -1,98 +1,115 @@
+#include "config.h"
 #include <iostream>
+#include <pthread.h>
 #include <fstream>
 #include <vector>
+#include <sstream>
 #include <random>
 #include <iomanip>
-#include <algorithm>
-#include <string>
 
 using namespace std;
 
-struct TraceEntry {
-    int task;
-    uint64_t address;
-    int size;
+pthread_mutex_t fileMutex = PTHREAD_MUTEX_INITIALIZER;
+
+struct ThreadArgs
+{
+    int tid;
+    int linesPerTask;
+    ofstream *outfile;
 };
 
-vector<TraceEntry> generateTrace(int numTasks, int numLines, int minSize, int maxSize, uint64_t minAddress, uint64_t maxAddress) {
-    vector<TraceEntry> trace;
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> taskDist(1, numTasks);
-    uniform_int_distribution<> sizeDist(minSize, maxSize);
-    uniform_int_distribution<uint64_t> addressDist(minAddress, maxAddress);
+struct MemorySection {
+    uintptr_t start;
+    uintptr_t end;
+    const char* name;
+};
 
-    for (int i = 0; i < numLines; ++i) {
-        TraceEntry entry;
-        entry.task = taskDist(gen);
-        entry.size = sizeDist(gen);
-        entry.address = addressDist(gen) & ~0x3FF; // Align to 1KB boundary
-        
-        // Ensure the address doesn't go out of bounds
-        if (entry.address + entry.size * 1024 > maxAddress) {
-            entry.address = maxAddress - entry.size * 1024;
-        }
-        
-        trace.push_back(entry);
-    }
+const MemorySection memorySections[] = {
+    {TEXT_SECTION_ADDRESS, DATA_SECTION_ADDRESS - 1, "Text"},
+    {DATA_SECTION_ADDRESS, BSS_SECTION_ADDRESS - 1, "Data"},
+    {BSS_SECTION_ADDRESS, HEAP_SECTION_ADDRESS - 1, "BSS"},
+    {HEAP_SECTION_ADDRESS, STACK_SECTION_ADDRESS - 1, "Heap"}
+};
 
-    return trace;
+const int numSections = sizeof(memorySections) / sizeof(MemorySection);
+
+uintptr_t alignToPageSize(uintptr_t address) {
+    return address & ~(PAGE_SIZE - 1);
+}   
+
+bool isAddressInSection(uintptr_t address, uintptr_t size, const MemorySection& section) {
+    return (address >= section.start) && (address + size <= section.end);
 }
 
-void writeTraceToFile(const vector<TraceEntry>& trace, const string& filename) {
-    ofstream outFile(filename);
-    if (!outFile) {
-        cerr << "Error: Unable to open file for writing." << endl;
-        return;
+void* generateTrace(void* arg) {
+    ThreadArgs* args = static_cast<ThreadArgs*>(arg);
+    int tid = args->tid;
+    int linesPerTask = args->linesPerTask;
+    ofstream& outFile = *(args->outfile);
+
+     random_device rd;
+     mt19937 gen(rd());
+     uniform_int_distribution<> sizeDist(1, 1000);  // Size from 1 to 1000 KB
+
+    for (int i = 0; i < linesPerTask; ++i) {
+        uintptr_t address;
+        uintptr_t size;
+        const MemorySection* selectedSection;
+
+        do {
+            // Randomly select a memory section
+            int sectionIndex =  uniform_int_distribution<>(0, numSections - 1)(gen);
+            selectedSection = &memorySections[sectionIndex];
+
+            // Generate a random address within the selected section
+             uniform_int_distribution<uintptr_t> addressDist(selectedSection->start, selectedSection->end);
+            address = alignToPageSize(addressDist(gen));
+
+            // Generate a random size
+            size = sizeDist(gen) * 1024;  // Convert KB to bytes
+        } while (!isAddressInSection(address, size, *selectedSection));
+
+         stringstream ss;
+        ss << "T" << tid << ":0x" <<  setfill('0') <<  setw(16) <<  hex << address
+           << ":" <<  dec << (size / 1024) << "KB\n";
+
+        pthread_mutex_lock(&fileMutex);
+        outFile << ss.str();
+        pthread_mutex_unlock(&fileMutex);
     }
 
-    for (const auto& entry : trace) {
-        outFile << "T" << entry.task << ":0x"
-                << setfill('0') << setw(8) << hex << entry.address
-                << ":" << dec << entry.size << "KB" << endl;
-    }
-
-    outFile.close();
+    delete args;
+    return nullptr;
 }
+int main()
+{
+    int noOfTasks, noOfLines;
+    cout << "Please Enter the no of tasks in the trace and no. of lines the tracefile should contain:" << endl;
+    cin >> noOfTasks >> noOfLines;
 
-int main() {
-    int numTasks, numLines, minSize, maxSize;
-    uint64_t minAddress, maxAddress;
-    int pageSize, virtualMemory, mainMemory;
+    int linesPerTask = noOfLines / noOfTasks;
 
-    cout << "Enter the number of tasks: ";
-    cin >> numTasks;
+    ofstream outfile("output.txt");
+    vector<pthread_t> threads(noOfTasks);
 
-    cout << "Enter the number of lines to generate: ";
-    cin >> numLines;
+    srand(time(nullptr));
 
-    cout << "Enter the minimum allocation size (in KB): ";
-    cin >> minSize;
+    for (int i = 0; i < noOfTasks; i++)
+    {
+        ThreadArgs *args = new ThreadArgs;
+        args->tid = i + 1;
+        args->linesPerTask = linesPerTask;
+        args->outfile = &outfile;
+        pthread_create(&threads[i], nullptr, generateTrace, args);
+    }
 
-    cout << "Enter the maximum allocation size (in KB): ";
-    cin >> maxSize;
+    for (int i = 0; i < noOfTasks; i++)
+    {
+        pthread_join(threads[i], nullptr);
+    }
 
-    cout << "Enter the minimum address (in hex, e.g., 0x00000000): ";
-    cin >> hex >> minAddress;
-
-    cout << "Enter the maximum address (in hex, e.g., 0x040FFFFF): ";
-    cin >> hex >> maxAddress;
-
-    cout << "Enter the PAGE_SIZE (in KB): ";
-    cin >> dec >> pageSize;
-
-    cout << "Enter the Virtual Memory size (in GB): ";
-    cin >> virtualMemory;
-
-    cout << "Enter the Main Memory size (in GB): ";
-    cin >> mainMemory;
-
-    vector<TraceEntry> trace = generateTrace(numTasks, numLines, minSize, maxSize, minAddress, maxAddress);
-
-    string filename = "tracefile_" + to_string(pageSize) + "KB_" + to_string(virtualMemory) + "GB_" + to_string(mainMemory) + "GB.txt";
-    writeTraceToFile(trace, filename);
-
-    cout << "Trace file '" << filename << "' has been generated." << endl;
+    outfile.close();
+    pthread_mutex_destroy(&fileMutex);
 
     return 0;
 }
