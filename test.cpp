@@ -18,60 +18,61 @@ struct ThreadArgs
     ofstream *outfile;
 };
 
-struct MemorySection {
+struct MemorySection
+{
     uintptr_t start;
     uintptr_t end;
-    const char* name;
+    const char *name;
 };
 
 const MemorySection memorySections[] = {
     {TEXT_SECTION_ADDRESS, DATA_SECTION_ADDRESS - 1, "Text"},
     {DATA_SECTION_ADDRESS, BSS_SECTION_ADDRESS - 1, "Data"},
     {BSS_SECTION_ADDRESS, HEAP_SECTION_ADDRESS - 1, "BSS"},
-    {HEAP_SECTION_ADDRESS, STACK_SECTION_ADDRESS - 1, "Heap"}
-};
+    {HEAP_SECTION_ADDRESS, STACK_SECTION_ADDRESS - 1, "Heap"}};
 
 const int numSections = sizeof(memorySections) / sizeof(MemorySection);
 
-uintptr_t alignToPageSize(uintptr_t address) {
+uintptr_t alignToPageSize(uintptr_t address)
+{
     return address & ~(PAGE_SIZE - 1);
-}   
+}
 
-bool isAddressInSection(uintptr_t address, uintptr_t size, const MemorySection& section) {
+bool isAddressInSection(uintptr_t address, uintptr_t size, const MemorySection &section)
+{
     return (address >= section.start) && (address + size <= section.end);
 }
 
-void* generateTrace(void* arg) {
-    ThreadArgs* args = static_cast<ThreadArgs*>(arg);
+void *generateTrace(void *arg)
+{
+    ThreadArgs *args = static_cast<ThreadArgs *>(arg);
     int tid = args->tid;
     int linesPerTask = args->linesPerTask;
-    ofstream& outFile = *(args->outfile);
+    ofstream &outFile = *(args->outfile);
 
-     random_device rd;
-     mt19937 gen(rd());
-     uniform_int_distribution<> sizeDist(1, 1000);  // Size from 1 to 1000 KB
-
-    for (int i = 0; i < linesPerTask; ++i) {
+    for (int i = 0; i < linesPerTask; ++i)
+    {
         uintptr_t address;
         uintptr_t size;
-        const MemorySection* selectedSection;
+        const MemorySection *selectedSection;
 
-        do {
+        do
+        {
             // Randomly select a memory section
-            int sectionIndex =  uniform_int_distribution<>(0, numSections - 1)(gen);
+            int sectionIndex = rand() % numSections;
             selectedSection = &memorySections[sectionIndex];
 
             // Generate a random address within the selected section
-             uniform_int_distribution<uintptr_t> addressDist(selectedSection->start, selectedSection->end);
-            address = alignToPageSize(addressDist(gen));
+            uintptr_t range = selectedSection->end - selectedSection->start;
+            address = alignToPageSize(selectedSection->start + (rand() % (range + 1)));
 
             // Generate a random size
-            size = sizeDist(gen) * 1024;  // Convert KB to bytes
+            size = (rand() % 100 + 1) * 1024;
         } while (!isAddressInSection(address, size, *selectedSection));
 
-         stringstream ss;
-        ss << "T" << tid << ":0x" <<  setfill('0') <<  setw(16) <<  hex << address
-           << ":" <<  dec << (size / 1024) << "KB\n";
+        stringstream ss;
+        ss << "T" << tid << ":0x" << setfill('0') << setw(8) << hex << address
+           << ":" << dec << (size / 1024) << "KB\n";
 
         pthread_mutex_lock(&fileMutex);
         outFile << ss.str();
@@ -81,10 +82,11 @@ void* generateTrace(void* arg) {
     delete args;
     return nullptr;
 }
+
 int main()
 {
     int noOfTasks, noOfLines;
-    cout << "Please Enter the no of tasks in the trace and no. of lines the tracefile should contain:" << endl;
+    cout << "Please Enter the no of tasks in the trace and no. of lines the tracefile should contain: ";
     cin >> noOfTasks >> noOfLines;
 
     int linesPerTask = noOfLines / noOfTasks;

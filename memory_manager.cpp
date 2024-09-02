@@ -1,28 +1,26 @@
 #include "memory_manager.h"
 #include <iostream>
 
-uint64_t* MemoryManager::allocateFrame()
+// function to allocate frame from the memory
+uint64_t *MemoryManager::allocateFrame()
 {
-    // if (freeFrames.empty())
-    // {
-    //     throw runtime_error("Memory Full..");
-    // }
-    // uint64_t frame = freeFrames.front();
-    // freeFrames.pop();
-    // allocatedFrames++;
-    if(allocatedFrames < totalFrames && freeFrames[allocatedFrames] == 0)
+    // check if frames are available for allocation
+    if (allocatedFrames < totalFrames && freeFrames[allocatedFrames] == 0)
     {
+        // initially, mark the frame as allocated
         freeFrames[allocatedFrames] = 1;
-        uint64_t *addr = (uint64_t*)&freeFrames[allocatedFrames];
+        uint64_t *addr = (uint64_t *)&freeFrames[allocatedFrames];
         allocatedFrames++;
-        return addr;
+        return addr; // return the address of allocated frame
     }
 
+    // throw runtime_error exception if no frames available
     throw runtime_error("Memory Full..");
     return nullptr;
 }
 
+// function to get the number of remaining frames that can be allocated
 uint64_t MemoryManager::getRemainingFrames()
 {
-    return totalFrames - allocatedFrames;
+    return totalFrames - allocatedFrames; // return the remaining frames
 }

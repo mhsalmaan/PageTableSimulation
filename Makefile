@@ -37,18 +37,15 @@ test.o: test.cpp
 
 # Clean up
 clean:
-	rm -f $(OBJS) $(TEST_OBJS) $(TARGET) $(TEST_TARGET)
+	rm -f $(OBJS) $(TEST_OBJS) $(TARGET) $(TEST_TARGET) output.txt
 
 # Run the main program
 run: $(TARGET)
 	./$(TARGET)
 
-# Run the test module
-run_test: $(TEST_TARGET)
+run-test: $(TEST_TARGET)
 	./$(TEST_TARGET)
 
-# PHONY targets
-.PHONY: clean run run_test all
+.PHONY: clean run run-test all
 
-# Build both main program and test module
 all: $(TARGET) $(TEST_TARGET)
