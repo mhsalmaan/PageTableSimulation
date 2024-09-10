@@ -9,20 +9,24 @@ using namespace std;
 // Map Implementation(Logical page number is the key and physical page number is value)
 void Task::requestMemory(uint64_t lAddr, uint64_t size, MemoryManager &memoryManager)
 {
-    uint64_t pagesNeeded = ceil(size / PAGE_SIZE); // Total pages needed for asked memory allocation
+    uint64_t pagesNeeded = (uint64_t)ceil((double)size / (double)PAGE_SIZE); // Total pages needed for asked memory allocation
     uint32_t startPage = lAddr / PAGE_SIZE;        // address of starting page
 
+    // cout << pagesNeeded << " " << "Start page no. : " << startPage << endl;
     // check for each page required  for requested memory
     for (uint64_t i = 0; i < pagesNeeded; i++)
     {
+        // cout << "Page no. at : " << startPage+i << endl;
         // check and increment page hit counter if current page is already in the page table
         if (pageTable.find(startPage + i) != pageTable.end())
         {
+            // cout << "Page Hit!" << endl;
             pageHit++;
         }
         // else increment the page fault counter if page is not found
         else
         {
+            // cout << "Page Fault!"<<endl;
             pageFault++;
             uint64_t *physicalPage = memoryManager.allocateFrame(); // allocate new physical frame
             pageTable[startPage + i] = physicalPage;                // map the logical page number to newly allocated physical page
